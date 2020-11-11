@@ -4,38 +4,53 @@ from indexer import Indexer
 import time
 from functools import reduce
 import sys
-
-import pandas as pd
+import os
+import psutil
+import csv
 
 class RTLI: #Reader, tokenizer, linguistic, indexer
-    def __init__(self,file='../content/all_sources_metadata_2020-03-13.csv'):
-        self.reader = Reader(file)
-        self.tokenizer = Tokenizer()
+    def __init__(self,tokenizer_mode,file='../content/all_sources_metadata_2020-03-13.csv',stopwords_file="../content/snowball_stopwords_EN.txt"):
+        self.reader = Reader(file) 
+        self.tokenizer = Tokenizer(tokenizer_mode,stopwords_file)
         self.indexer = Indexer()
 
         # tryout for new structure in dict
         self.indexed_map = {}
 
-    def process(self,tokenizer_mode="simple"):
+    def process(self):
 
         # Reading step
-        dataframe = self.reader.read_text() # This provides a pandas dataframe
+        #dataframe = self.reader.read_text() # This provides a pandas dataframe
+        tokens = []
         
-        # for each row in the datafram we will tokenize and index
-        for index, row in dataframe.iterrows(): 
 
-            # Tokenizer step
-            appended_string = row['abstract'] + " " + row['title']
-            tokens = self.tokenizer.tokenize(appended_string,tokenizer_mode=tokenizer_mode)
+        # for each row in the datafram we will tokenize and index
+        tic = time.time()
+
+        with open('../content/all_sources_metadata_2020-03-13.csv', newline='') as csvfile:
+            reader = csv.DictReader(csvfile)
+                        
+            for row in reader: 
+                index = row['doi']
+                # Tokenizer step
+                if row['abstract'] != "":
+                    appended_string = row['abstract'] + " " + row['title']
+                    tokens += self.tokenizer.tokenize(appended_string, index)
 
             # Indexer step
-            self.indexer.index(tokens, index)    
+        toc = time.time()
+        print("Estimated tokenizing/stemming time: %.4fs" % (toc-tic))
+
+        tic = time.time()
+        self.indexer.index(tokens, index)    
+        toc = time.time()
+        print("Estimated indexing time: %.4fs" % (toc-tic))
 
         self.indexed_map = self.indexer.getIndexed()
 
     def domain_questions(self,time):
         # Question a)
-        mem_size = sys.getsizeof(self.indexed_map) / 1024 / 1024
+        mem_size = self.calculate_dict_size(self.indexed_map) / 1024 / 1024
         print("A) Estimated process time: %.4fs and spent %.2f Mb of memory" % (time,mem_size))
 
         # Question b)
@@ -58,6 +73,14 @@ class RTLI: #Reader, tokenizer, linguistic, indexer
         for term in ten_most_frequent:
             print(term)
 
+    
+    def calculate_dict_size(self,input_dict):
+        mem_size = 0
+        for key,value in input_dict.items():
+            mem_size += sys.getsizeof(value)   # in python they dont count size, so we have to do it iteratively
+
+        return mem_size + sys.getsizeof(input_dict) # adding the own dictionary size
+
 if __name__ == "__main__": #maybe option -t simple or -t complex
     
     
@@ -65,19 +88,19 @@ if __name__ == "__main__": #maybe option -t simple or -t complex
         print("Usage: python3 main.py <complex/simple>")
         sys.exit(1)
     
-    tic = time.time()
-    rtli = RTLI()
 
     if sys.argv[1] == "complex":
-        rtli.process("complex")
+        rtli = RTLI(tokenizer_mode="complex")
     
     elif sys.argv[1] == "simple":
-        rtli.process()
+        rtli = RTLI(tokenizer_mode="simple")
     
     else:
         print("Usage: python3 main.py <complex/simple>")
         sys.exit(1)
     
+    tic = time.time()
+    rtli.process()
     toc = time.time()
     #print(rtli.indexed_map)
     rtli.domain_questions(toc-tic)
