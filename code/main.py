@@ -4,6 +4,7 @@ from indexer import Indexer
 import time
 from functools import reduce
 import sys
+import math
 import os
 import psutil
 import csv
@@ -29,14 +30,16 @@ class RTLI: #Reader, tokenizer, linguistic, indexer
 
         with open('../content/all_sources_metadata_2020-03-13.csv', newline='') as csvfile:
             reader = csv.DictReader(csvfile)
-                        
+            i = 0
             for row in reader: 
+                if i == 5:
+                    break
                 index = row['doi']
                 # Tokenizer step
                 if row['abstract'] != "":
                     appended_string = row['abstract'] + " " + row['title']
                     tokens += self.tokenizer.tokenize(appended_string, index)
-
+                i+=1
             # Indexer step
         toc = time.time()
         print("Estimated tokenizing/stemming time: %.4fs" % (toc-tic))
@@ -47,6 +50,34 @@ class RTLI: #Reader, tokenizer, linguistic, indexer
         print("Estimated indexing time: %.4fs" % (toc-tic))
 
         self.indexed_map = self.indexer.getIndexed()
+        print("Indexed map: ", self.indexed_map)
+
+    def rank_terms(self):
+        """current structure
+        {  'novel': 
+            {
+                '10.3390/jcm9020538': 2, 
+                '10.3390/jcm9020575': 1, 
+                '10.1016/j.idm.2020.02.001': 2, 
+                ...
+            },
+            'new': 
+            {
+                '10.3390/jcm9020538': 4, 
+            ...
+        
+        """
+        # Iterate over indexed terms to change value
+
+        for key,value in self.indexed_map.items():
+            term_dict = self.indexed_map[key]['doc_ids']
+            for doc_id,count in value['doc_ids'].items():
+                term_dict[doc_id] = math.log10(count)+1
+                self.indexed_map[key]['doc_ids'] = term_dict
+        
+        
+        print("Indexed map: ", self.indexed_map)
+
 
     def domain_questions(self,time):
         # Question a)
@@ -104,3 +135,9 @@ if __name__ == "__main__": #maybe option -t simple or -t complex
     toc = time.time()
     #print(rtli.indexed_map)
     rtli.domain_questions(toc-tic)
+
+    #Show results for ranking
+    tic = time.time()
+    rtli.rank_terms()
+    toc = time.time()
+    print("Time spent ranking documents: %.4fs" % (toc-tic))
