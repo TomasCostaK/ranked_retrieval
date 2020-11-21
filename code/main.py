@@ -116,6 +116,13 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
             """
         #print("Indexed map: ", self.indexed_map)
 
+    def write_index_file(self, file_output='../output/indexed_map.txt'):
+
+        with open(file_output,'w+') as f:
+            for term, value in self.indexed_map.items(): 
+                string = term + ": " + str(value)
+                f.write(string)
+
     # TODO, change this later, since we changed the structure
     def domain_questions(self, time):
         # Question a)
@@ -182,6 +189,8 @@ if __name__ == "__main__":  # maybe option -t simple or -t complex
     tic = time.time()
     best_docs = rtli.rank_docs("coronavirus origin",10)
     toc = time.time()
+
+    rtli.write_index_file()
 
     print("Most relevant docs: %s" % (best_docs))
     print("Time spent ranking documents: %.4fs" % (toc-tic))
