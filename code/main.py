@@ -42,14 +42,17 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
         # We passed the reader to here, so we could do reading chunk by chunk
         with open(self.file, newline='', encoding="utf-8") as csvfile:
             reader = csv.DictReader(csvfile)
-
+            i = 0
             for chunk in self.gen_chunks(reader):
                 for row in chunk:
+                    if i==5:
+                        break
                     index = row['doi']
                     # Tokenizer step
                     if row['abstract'] != "":
                         appended_string = row['abstract'] + " " + row['title']
                         tokens += self.tokenizer.tokenize(appended_string, index)
+                    i+=1 
             
                 #print("Estimated tokenizing/stemming time: %.4fs" % (toc-tic)) #useful for debugging
 
@@ -82,7 +85,7 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
                 self.indexed_map[key]['doc_ids'] = term_dict
         
         
-        #print("Indexed map: ", self.indexed_map)
+        print("Indexed map: ", self.indexed_map)
 
     def domain_questions(self, time):
         # Question a)
