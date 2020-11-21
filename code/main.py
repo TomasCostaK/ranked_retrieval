@@ -96,9 +96,9 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
                 #normalization step
                 """
                 length_normalize = math.sqrt(sum([x**2 for x in query_weights_list])) * math.sqrt(sum([x**2 for x in documents_weights_list]))
-                best_docs[doc_id] += (weight_query_term * tf_doc_weight) #/ length_normalize
+                best_docs[doc_id] += (weight_query_term * tf_doc_weight) / length_normalize
 
-        most_relevant_docs = sorted(best_docs.items(), key=operator.itemgetter(1), reverse=True)
+        most_relevant_docs = sorted(best_docs.items(), key=lambda x: x[1], reverse=True)
         
         return most_relevant_docs[:docs_limit]
         """
@@ -177,7 +177,7 @@ if __name__ == "__main__":  # maybe option -t simple or -t complex
     rtli.process()
     toc = time.time()
 
-    rtli.domain_questions(toc-tic)
+    #rtli.domain_questions(toc-tic)
     #Show results for ranking
     tic = time.time()
     best_docs = rtli.rank_docs("coronavirus origin",10)
