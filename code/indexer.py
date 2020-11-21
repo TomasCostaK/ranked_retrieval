@@ -28,3 +28,15 @@ class Indexer:
                     value_dict[idx] += 1
                     self.indexed_words[term]['col_freq'] += 1
                 self.indexed_words[term]['doc_ids'] = value_dict
+
+    def index_query(self,tokens):
+        indexed_query = {}
+        for token in tokens:
+            # Desagragate tuple
+            term = token[0]
+
+            if term not in indexed_query.keys():
+                indexed_query[term] = 1
+            else:
+                indexed_query[term] += 1
+        return indexed_query

@@ -25,6 +25,9 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
         # tryout for new structure in dict
         self.indexed_map = {}
 
+        # collection size
+        self.collection_size = 0
+
 
     def gen_chunks(self, reader):
         chunk = []
@@ -42,17 +45,16 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
         # We passed the reader to here, so we could do reading chunk by chunk
         with open(self.file, newline='', encoding="utf-8") as csvfile:
             reader = csv.DictReader(csvfile)
-            i = 0
             for chunk in self.gen_chunks(reader):
                 for row in chunk:
-                    if i==5:
+                    if self.collection_size==5:
                         break
                     index = row['doi']
                     # Tokenizer step
                     if row['abstract'] != "":
                         appended_string = row['abstract'] + " " + row['title']
                         tokens += self.tokenizer.tokenize(appended_string, index)
-                    i+=1 
+                    self.collection_size += 1 
             
                 #print("Estimated tokenizing/stemming time: %.4fs" % (toc-tic)) #useful for debugging
 
@@ -61,31 +63,43 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
 
         self.indexed_map = self.indexer.getIndexed()
 
-    def rank_terms(self):
-        """current structure
-        {  'novel': 
-            {
-                '10.3390/jcm9020538': 2, 
-                '10.3390/jcm9020575': 1, 
-                '10.1016/j.idm.2020.02.001': 2, 
-                ...
-            },
-            'new': 
-            {
-                '10.3390/jcm9020538': 4, 
-            ...
-        
-        """
-        # Iterate over indexed terms to change value
+    def rank_docs(self, query):
+        # declaration of vars to be used in tf.idf
+        scores = {}
+        N = self.collection_size
 
-        for key,value in self.indexed_map.items():
-            term_dict = self.indexed_map[key]['doc_ids']
-            for doc_id,count in value['doc_ids'].items():
-                term_dict[doc_id] = math.log10(count)+1
-                self.indexed_map[key]['doc_ids'] = term_dict
+        # Special call to indexer, so we can access the term frequency, making use of modularization
+        indexed_query = self.indexer.index_query(self.tokenizer.tokenize(query,-1))
+
+        for term,tf in indexed_query.items():
+            #special treatment, weights at 0
+            if term not in self.indexed_map.keys():
+                continue
+            
+            tf_weight = math.log10(tf) + 1
+            df = self.indexed_map[term]['doc_freq']
+            idf = math.log10(N/float(df))
+
+            weight_query_term = tf_weight * idf #this is the weight for the term in the query
+
+            # now we iterate over every term
+            
+            
+            
+            for key,value in self.indexed_map.items():
+                term_dict = self.indexed_map[key]['doc_ids']
+                
+                # iterate every doc_id in term and associate its tdf
+                for doc_id,count in value['doc_ids'].items():
+                    term_dict[doc_id] = math.log10(count)+1
+                    self.indexed_map[key]['doc_ids'] = term_dict
+
+                # calculate idf for each term
+                idf = math.log10(self.collection_size / value['doc_freq'])
+                value['idf'] = idf
         
-        
-        print("Indexed map: ", self.indexed_map)
+        print("Size of docs: ", self.collection_size)
+        #print("Indexed map: ", self.indexed_map)
 
     def domain_questions(self, time):
         # Question a)
@@ -150,6 +164,6 @@ if __name__ == "__main__":  # maybe option -t simple or -t complex
     rtli.domain_questions(toc-tic)
     #Show results for ranking
     tic = time.time()
-    rtli.rank_terms()
+    rtli.rank_docs("Uma frase. frase de exemplo wuhan the coronavirus")
     toc = time.time()
     print("Time spent ranking documents: %.4fs" % (toc-tic))
