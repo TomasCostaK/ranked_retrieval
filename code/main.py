@@ -63,6 +63,33 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
 
         self.indexed_map = self.indexer.getIndexed()
 
+
+    def process_queries(self, path='../content/queries.txt', mode='tf_idf',docs_limit=10):
+        if mode=='tf_idf':
+            #Show results for ranking
+            with open(path,'r') as f:
+                for query in f.readlines():
+                    print("\nResults for query: %s\n" % (query))
+                    tic = time.time()
+                    best_docs = self.rank_tf_idf(query,docs_limit)
+                    for doc in best_docs:
+                        print("Document: %s \t with relevance: %.5f" % (doc[0], doc[1]))
+                    toc = time.time()
+                    print("\t Documents retrieved in %.4f seconds" % (toc-tic))
+
+
+        elif mode=='bm25':
+            #Show results for ranking
+            with open(path,'r') as f:
+                for query in f.readlines:
+                    print("Results for query: %s\n" % (query))
+                    best_docs = self.rank_bm25(query,docs_limit)
+                    print("Document: %s \t with relevance: %.5f" % (doc[0], doc[1]))
+        else:
+            usage()
+            sys.exit(1)
+
+
     def rank_tf_idf(self, query, docs_limit=10):
         # declaration of vars to be used in tf.idf
         best_docs = collections.defaultdict(lambda: 0) # default start at 0 so we can do cumulative gains
@@ -90,16 +117,21 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
                 tf_doc_weight = math.log10(tf_doc) + 1
                 documents_weights_list.append(tf_doc_weight)
                 
-                """ TODO these calculus are wrong in the calculator, talk to prof
+                """ #TODO these calculus are wrong in the calculator, talk to prof
                 documents_weights_list = [0,1.3,2,3]
                 query_weights_list = [1,0,1,1.3]
                 #normalization step
                 """
-                length_normalize = math.sqrt(sum([x**2 for x in query_weights_list])) * math.sqrt(sum([x**2 for x in documents_weights_list]))
-                best_docs[doc_id] += (weight_query_term * tf_doc_weight) / length_normalize
-
-        most_relevant_docs = sorted(best_docs.items(), key=lambda x: x[1], reverse=True)
+                best_docs[doc_id] += (weight_query_term * tf_doc_weight) 
         
+        length_normalize = math.sqrt(sum([x**2 for x in query_weights_list])) * math.sqrt(sum([x**2 for x in documents_weights_list]))
+            
+        #find a better way to normalize data
+        #best_docs /= length_normalize #now we normalize the results, and reset the arrays
+        for k, v in best_docs.items():
+            best_docs[k] = v/length_normalize
+        
+        most_relevant_docs = sorted(best_docs.items(), key=lambda x: x[1], reverse=True)
         return most_relevant_docs[:docs_limit]
         """
             for key,value in self.indexed_map.items():
@@ -116,8 +148,8 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
             """
         #print("Indexed map: ", self.indexed_map)
 
-    def rank_bm25(self):
-        pass
+    def rank_bm25(self, query, docs_limit=10):
+        return 0
 
     def write_index_file(self, file_output='../output/indexed_map.txt'):
 
@@ -125,6 +157,7 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
             for term, value in self.indexed_map.items(): 
                 string = term + ": " + str(value)
                 f.write(string)
+
 
     def domain_questions(self, time):
         # Question a)
@@ -156,6 +189,7 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
         for term in ten_most_frequent:
             print(term)
 
+
     def calculate_dict_size(self, input_dict):
         mem_size = 0
         for key, value in input_dict.items():
@@ -167,11 +201,13 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
         # adding the own dictionary size
         return mem_size + sys.getsizeof(input_dict)
 
+def usage():
+    print("Usage: python3 main.py <complex/simple> <chunksize>")
 
 if __name__ == "__main__":  # maybe option -t simple or -t complex
 
     if len(sys.argv) < 3:
-        print("Usage: python3 main.py <complex/simple> <chunksize>")
+        usage()
         sys.exit(1)
 
     if sys.argv[1] == "complex":
@@ -189,12 +225,11 @@ if __name__ == "__main__":  # maybe option -t simple or -t complex
     toc = time.time()
 
     rtli.domain_questions(toc-tic)
-    #Show results for ranking
+    
     tic = time.time()
-    best_docs = rtli.rank_tf_idf("coronavirus origin",10)
+    rtli.process_queries('../content/queries.txt',mode='tf_idf')
+    #rtli.process_queries('queries.txt',mode='bm25')
     toc = time.time()
+    print("Time spent ranking documents: %.4fs" % (toc-tic))
 
     rtli.write_index_file()
-
-    print("Most relevant docs: %s" % (best_docs))
-    print("Time spent ranking documents: %.4fs" % (toc-tic))
