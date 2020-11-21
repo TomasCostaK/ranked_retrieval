@@ -2,9 +2,11 @@ from tokenizer import Tokenizer
 from indexer import Indexer
 import time
 import sys
+import operator
 import os
 import csv
 import math
+import collections
 
 """
 Authors:
@@ -47,8 +49,6 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
             reader = csv.DictReader(csvfile)
             for chunk in self.gen_chunks(reader):
                 for row in chunk:
-                    if self.collection_size==5:
-                        break
                     index = row['doi']
                     # Tokenizer step
                     if row['abstract'] != "":
@@ -63,29 +63,45 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
 
         self.indexed_map = self.indexer.getIndexed()
 
-    def rank_docs(self, query):
+    def rank_docs(self, query, docs_limit=10):
         # declaration of vars to be used in tf.idf
-        scores = {}
+        best_docs = collections.defaultdict(lambda: 0) # default start at 0 so we can do cumulative gains
         N = self.collection_size
 
         # Special call to indexer, so we can access the term frequency, making use of modularization
         indexed_query = self.indexer.index_query(self.tokenizer.tokenize(query,-1))
+        query_weights_list = []
+        documents_weights_list = []
 
-        for term,tf in indexed_query.items():
+        for term,tf_query in indexed_query.items():
             #special treatment, weights at 0
             if term not in self.indexed_map.keys():
                 continue
             
-            tf_weight = math.log10(tf) + 1
+            tf_weight = math.log10(tf_query) + 1
             df = self.indexed_map[term]['doc_freq']
             idf = math.log10(N/float(df))
 
             weight_query_term = tf_weight * idf #this is the weight for the term in the query
+            query_weights_list.append(weight_query_term)
 
             # now we iterate over every term
-            
-            
-            
+            for doc_id, tf_doc in self.indexed_map[term]['doc_ids'].items():
+                tf_doc_weight = math.log10(tf_doc) + 1
+                documents_weights_list.append(tf_doc_weight)
+                
+                """ TODO these calculus are wrong in the calculator, talk to prof
+                documents_weights_list = [0,1.3,2,3]
+                query_weights_list = [1,0,1,1.3]
+                #normalization step
+                """
+                length_normalize = math.sqrt(sum([x**2 for x in query_weights_list])) * math.sqrt(sum([x**2 for x in documents_weights_list]))
+                best_docs[doc_id] += (weight_query_term * tf_doc_weight) / length_normalize
+
+        most_relevant_docs = sorted(best_docs.items(), key=operator.itemgetter(1), reverse=True)
+        
+        return most_relevant_docs[:docs_limit]
+        """
             for key,value in self.indexed_map.items():
                 term_dict = self.indexed_map[key]['doc_ids']
                 
@@ -97,8 +113,7 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
                 # calculate idf for each term
                 idf = math.log10(self.collection_size / value['doc_freq'])
                 value['idf'] = idf
-        
-        print("Size of docs: ", self.collection_size)
+            """
         #print("Indexed map: ", self.indexed_map)
 
     def domain_questions(self, time):
@@ -161,9 +176,11 @@ if __name__ == "__main__":  # maybe option -t simple or -t complex
     rtli.process()
     toc = time.time()
 
-    rtli.domain_questions(toc-tic)
+    #rtli.domain_questions(toc-tic)
     #Show results for ranking
     tic = time.time()
-    rtli.rank_docs("Uma frase. frase de exemplo wuhan the coronavirus")
+    best_docs = rtli.rank_docs("coronavirus origin",3)
     toc = time.time()
+
+    print("Most relevant docs: %s" % (best_docs))
     print("Time spent ranking documents: %.4fs" % (toc-tic))
