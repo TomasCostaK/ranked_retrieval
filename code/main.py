@@ -63,7 +63,7 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
 
         self.indexed_map = self.indexer.getIndexed()
 
-    def rank_docs(self, query, docs_limit=10):
+    def rank_tf_idf(self, query, docs_limit=10):
         # declaration of vars to be used in tf.idf
         best_docs = collections.defaultdict(lambda: 0) # default start at 0 so we can do cumulative gains
         N = self.collection_size
@@ -116,6 +116,9 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
             """
         #print("Indexed map: ", self.indexed_map)
 
+    def rank_bm25(self):
+        pass
+
     def write_index_file(self, file_output='../output/indexed_map.txt'):
 
         with open(file_output,'w+') as f:
@@ -123,7 +126,6 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
                 string = term + ": " + str(value)
                 f.write(string)
 
-    # TODO, change this later, since we changed the structure
     def domain_questions(self, time):
         # Question a)
         mem_size = self.calculate_dict_size(self.indexed_map) / 1024 / 1024
@@ -137,7 +139,7 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
         # Question c)
         # i think we can do this, because these keys only have 1 value, which is the least possible to get inserted into the dict
         ten_least_frequent = [key for (key, value) in sorted(
-            self.indexed_map.items(), key=lambda x: (len(x[1]), x[0]), reverse=False)[:10]]
+            self.indexed_map.items(), key=lambda x: x[1]['col_freq'], reverse=False)[:10]]
         # sort alphabetical
         #ten_least_frequent.sort()
         print("\nC) Ten least frequent terms:")
@@ -147,7 +149,7 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
         # Question d)
         # i think we can do this, because these keys only have 1 value, which is the least possible to get inserted into the dict
         ten_most_frequent = [key for (key, value) in sorted(
-            self.indexed_map.items(), key=lambda x: (len(x[1]), x[0]), reverse=True)[:10]]
+            self.indexed_map.items(), key=lambda x: x[1]['col_freq'], reverse=True)[:10]]
         # sort alphabetical
         #ten_most_frequent.sort()
         print("\nD) Ten most frequent terms:")
@@ -159,6 +161,8 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
         for key, value in input_dict.items():
             # in python they dont count size, so we have to do it iteratively
             mem_size += sys.getsizeof(value)
+            for key2, value2 in value['doc_ids'].items(): 
+                mem_size += sys.getsizeof(value2)
 
         # adding the own dictionary size
         return mem_size + sys.getsizeof(input_dict)
@@ -184,10 +188,10 @@ if __name__ == "__main__":  # maybe option -t simple or -t complex
     rtli.process()
     toc = time.time()
 
-    #rtli.domain_questions(toc-tic)
+    rtli.domain_questions(toc-tic)
     #Show results for ranking
     tic = time.time()
-    best_docs = rtli.rank_docs("coronavirus origin",10)
+    best_docs = rtli.rank_tf_idf("coronavirus origin",10)
     toc = time.time()
 
     rtli.write_index_file()
