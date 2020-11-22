@@ -64,7 +64,7 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
         self.indexed_map = self.indexer.getIndexed()
 
 
-    def process_queries(self, path='../content/queries.txt', mode='tf_idf',docs_limit=10):
+    def process_queries(self, path='../content/queries.txt', mode='tf_idf', k1=1.2, b=0.75 ,docs_limit=10):
         if mode=='tf_idf':
             #Show results for ranking
             with open(path,'r') as f:
@@ -81,10 +81,14 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
         elif mode=='bm25':
             #Show results for ranking
             with open(path,'r') as f:
-                for query in f.readlines:
+                for query in f.readlines():
                     print("Results for query: %s\n" % (query))
-                    best_docs = self.rank_bm25(query,docs_limit)
-                    print("Document: %s \t with relevance: %.5f" % (doc[0], doc[1]))
+                    tic = time.time()
+                    best_docs = self.rank_bm25(query, k1, b, docs_limit)
+                    for doc in best_docs:
+                        print("Document: %s \t with score: %.5f" % (doc[0], doc[1]))
+                    toc = time.time()
+                    print("\t Documents retrieved in %.4f seconds" % (toc-tic))
         else:
             usage()
             sys.exit(1)
@@ -148,8 +152,42 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
             """
         #print("Indexed map: ", self.indexed_map)
 
-    def rank_bm25(self, query, docs_limit=10):
-        return 0
+    def rank_bm25(self, query, k1, b, docs_limit=10):
+        # declaration of vars to be used in tf.idf
+        best_docs = collections.defaultdict(lambda: 0) # default start at 0 so we can do cumulative gains
+        N = self.collection_size
+
+        # Special call to indexer, so we can access the term frequency, making use of modularization
+        indexed_query = self.indexer.index_query(self.tokenizer.tokenize(query,-1))
+
+        for term,tf_query in indexed_query.items():
+            #special treatment, weights at 0
+            if term not in self.indexed_map.keys():
+                continue
+
+            df = self.indexed_map[term]['doc_freq']
+
+            # calculate idf for each term
+            # TODO, ask teacher if this IDF is calculated well
+            idf = math.log10(self.collection_size / self.indexed_map[term]['doc_freq'])
+            self.indexed_map[term]['idf'] = idf
+            # now we iterate over every term
+            dl = 400
+            avdl = 300
+            for doc_id, tf_doc in self.indexed_map[term]['doc_ids'].items():
+                score = self.calculate_BM25(df, k1, b, dl, avdl, tf_doc)
+                best_docs[doc_id] += score
+        
+        most_relevant_docs = sorted(best_docs.items(), key=lambda x: x[1], reverse=True)
+        return most_relevant_docs[:docs_limit]
+
+    def calculate_BM25(self, df, k1, b, dl, avdl, tf_doc):
+        N = self.collection_size
+
+        #TODO, confirm this is correct
+        term1 = math.log(N/df)
+        term2 = ((k1 + 1) * tf_doc) / ( k1 * ((1-b) + b*dl/avdl) + tf_doc )
+        return term1*term2
 
     def write_index_file(self, file_output='../output/indexed_map.txt'):
 
@@ -227,8 +265,10 @@ if __name__ == "__main__":  # maybe option -t simple or -t complex
     rtli.domain_questions(toc-tic)
     
     tic = time.time()
-    rtli.process_queries('../content/queries.txt',mode='tf_idf')
-    #rtli.process_queries('queries.txt',mode='bm25')
+    k1 = 1.2
+    b = 0.75
+    rtli.process_queries('../content/queries.txt',k1=k1, b=b,mode='bm25', docs_limit=10)
+    #rtli.process_queries('queries.txt',mode='tf_idf')
     toc = time.time()
     print("Time spent ranking documents: %.4fs" % (toc-tic))
 
