@@ -27,6 +27,9 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
         # tryout for new structure in dict
         self.indexed_map = {}
 
+        # used in bm25 to check each documents length, and the average of all docs
+        self.docs_length = {}
+
         # collection size
         self.collection_size = 0
 
@@ -54,7 +57,9 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
                     if row['abstract'] != "":
                         appended_string = row['abstract'] + " " + row['title']
                         tokens += self.tokenizer.tokenize(appended_string, index)
-                    self.collection_size += 1 
+
+                        self.docs_length[index] = len(tokens)
+                        self.collection_size += 1 
             
                 #print("Estimated tokenizing/stemming time: %.4fs" % (toc-tic)) #useful for debugging
 
@@ -128,29 +133,16 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
                 """
                 best_docs[doc_id] += (weight_query_term * tf_doc_weight) 
         
+        # TODO, this normalization is wrong, see where i can add the doc_length
         length_normalize = math.sqrt(sum([x**2 for x in query_weights_list])) * math.sqrt(sum([x**2 for x in documents_weights_list]))
             
         #find a better way to normalize data
-        #best_docs /= length_normalize #now we normalize the results, and reset the arrays
         for k, v in best_docs.items():
             best_docs[k] = v/length_normalize
         
         most_relevant_docs = sorted(best_docs.items(), key=lambda x: x[1], reverse=True)
         return most_relevant_docs[:docs_limit]
-        """
-            for key,value in self.indexed_map.items():
-                term_dict = self.indexed_map[key]['doc_ids']
-                
-                # iterate every doc_id in term and associate its tdf
-                for doc_id,count in value['doc_ids'].items():
-                    term_dict[doc_id] = math.log10(count)+1
-                    self.indexed_map[key]['doc_ids'] = term_dict
 
-                # calculate idf for each term
-                idf = math.log10(self.collection_size / value['doc_freq'])
-                value['idf'] = idf
-            """
-        #print("Indexed map: ", self.indexed_map)
 
     def rank_bm25(self, query, k1, b, docs_limit=10):
         # declaration of vars to be used in tf.idf
@@ -171,10 +163,11 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
             # TODO, ask teacher if this IDF is calculated well
             idf = math.log10(self.collection_size / self.indexed_map[term]['doc_freq'])
             self.indexed_map[term]['idf'] = idf
+
+            avdl = sum([ value for key,value in self.docs_length.items()]) / self.collection_size
             # now we iterate over every term
-            dl = 400
-            avdl = 300
             for doc_id, tf_doc in self.indexed_map[term]['doc_ids'].items():
+                dl = self.docs_length[doc_id]
                 score = self.calculate_BM25(df, k1, b, dl, avdl, tf_doc)
                 best_docs[doc_id] += score
         
