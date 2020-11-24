@@ -66,6 +66,13 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
                 #print("Estimated indexing time: %.4fs" % (toc-tic)) #useful for debugging
 
         self.indexed_map = self.indexer.getIndexed()
+        self.updateIdfs()
+
+    # we call this extra step, so every term has an idf
+    def updateIdfs(self):
+        for term, value in self.indexed_map.items():
+            idf = math.log10(self.collection_size / self.indexed_map[term]['doc_freq'])
+            self.indexed_map[term]['idf'] = idf
 
 
     def process_queries(self, path='../content/queries.txt', mode='tf_idf', k1=1.2, b=0.75 ,docs_limit=10):
@@ -101,6 +108,7 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
                     docs_ids = [doc_id for doc_id, score in best_docs]
                     
                     # evaluate each query and print a table
+                    #TODO here, evaluate for each of the 10, 20, 50
                     self.evaluate_query(query_n, docs_ids)
                     query_n += 1
         else:
@@ -127,7 +135,7 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
             
             tf_weight = math.log10(tf_query) + 1
             df = self.indexed_map[term]['doc_freq']
-            idf = math.log10(N/float(df))
+            idf = self.indexed_map[term]['idf']
 
             weight_query_term = tf_weight * idf #this is the weight for the term in the query
             query_weights_list.append(weight_query_term)
@@ -172,8 +180,7 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
 
             # calculate idf for each term
             # TODO, ask teacher if this IDF is calculated well
-            idf = math.log10(self.collection_size / self.indexed_map[term]['doc_freq'])
-            self.indexed_map[term]['idf'] = idf
+            idf = self.indexed_map[term]['idf']
 
             avdl = sum([ value for key,value in self.docs_length.items()]) / self.collection_size
             # now we iterate over every term
@@ -247,7 +254,7 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
 
         with open(file_output,'w+') as f:
             for term, value in self.indexed_map.items(): 
-                string = term + ": " + str(value)
+                string = term + ": " + str(value) + '\n'
                 f.write(string)
 
 
@@ -321,7 +328,7 @@ if __name__ == "__main__":  # maybe option -t simple or -t complex
     tic = time.time()
     k1 = 1.2
     b = 0.75
-    rtli.process_queries('../content/queries.txt',k1=k1, b=b,mode='bm25', docs_limit=10)
+    rtli.process_queries('../content/queries.txt',k1=k1, b=b,mode='bm25', docs_limit=50)
     #rtli.process_queries('queries.txt',mode='tf_idf')
     toc = time.time()
     print("Time spent ranking documents: %.4fs" % (toc-tic))
