@@ -116,7 +116,7 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
             sys.exit(1)
 
     def queries_results(self):
-        print("  \t\tPrecision \t\t Recall  	\tF-measure     \tAverage Precision \tNDCG \tLatency\nQuery #	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50")
+        print("  \t\tPrecision \t\t Recall  	\tF-measure     \tAverage Precision \tNDCG \t\tLatency\nQuery #	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50")
 
     def rank_tf_idf(self, query, docs_limit=10):
         # declaration of vars to be used in tf.idf
@@ -218,10 +218,21 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
 
             #Open queries relevance
             with open('../content/queries.relevance.filtered.txt','r') as q_f:
+                # variables for average precision
+                doc_counter = 0
+                docs_ap = []
+
+                # variables for ndcg
+                relevance_ndcg = []
+
                 for q_relevance in q_f.readlines():
+                    
                     query_relevance_array = q_relevance.split(" ") # 1st is query number, 2nd is document id, 3rd is relevance
                     
                     if int(query_relevance_array[0]) == query_n:
+                        # treatment for ndcg
+                        relevance_ndcg.append(query_relevance_array[2])
+
                         # if relevant and not showing up - FN
                         if int(query_relevance_array[2]) > 0 and query_relevance_array[1] not in docs_ids_new:
                             fn += 1
@@ -232,7 +243,12 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
 
                         # if showing up and relevant - TP
                         if int(query_relevance_array[2]) > 0 and query_relevance_array[1] in docs_ids_new:
-                            tp += 1                    
+                            tp += 1   
+                            try:
+                                temp_ap = tp / (fp + tp)
+                            except ZeroDivisionError:
+                                temp_ap = 0
+                            docs_ap.append(temp_ap)                 
                     
                     elif int(query_relevance_array[0]) > query_n:
                         break
@@ -255,11 +271,16 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
                     f_score = (2 * recall * precision) / (recall + precision)
 
                 # average precision
-                ap = 1
+                ap = sum(docs_ap)/len(docs_ap)
 
                 # ndcg
-                ndcg = 6.19
+                ndcg_real = [relevance_ndcg[i]/(math.log2(i)) for i in range(len(relevance_ndcg))]
+                
+                relevance_ndcg = sorted(relevance_ndcg)
+                ndcg_ideal = [relevance_ndcg[i]/(math.log2(i)) for i in range(len(relevance_ndcg))]
+                ndcg = sum( ndcg_real/ndcg_ideal )
 
+                print("NDCG REAL: ", ndcg_real)
                 #do the same but for calculating recall
                 if i==0:
                     recall_10 = recall
