@@ -109,14 +109,14 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
                     
                     # evaluate each query and print a table
                     #TODO here, evaluate for each of the 10, 20, 50
-                    self.evaluate_query(query_n, docs_ids)
+                    self.evaluate_query(query_n, docs_ids, toc-tic)
                     query_n += 1
         else:
             usage()
             sys.exit(1)
 
     def queries_results(self):
-        print("\tPrecision \tRecall	\tF-measure	\tAverage \tPrecision \tNDCG \tLatency\nQuery #	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50")
+        print("  \t\tPrecision \t\t Recall  	\tF-measure     \tAverage Precision \tNDCG \tLatency\nQuery #	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50")
 
     def rank_tf_idf(self, query, docs_limit=10):
         # declaration of vars to be used in tf.idf
@@ -163,7 +163,7 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
         return most_relevant_docs[:docs_limit]
 
 
-    def rank_bm25(self, query, k1, b, docs_limit=10):
+    def rank_bm25(self, query, k1, b, docs_limit=50):
         # declaration of vars to be used in tf.idf
         best_docs = collections.defaultdict(lambda: 0) # default start at 0 so we can do cumulative gains
         N = self.collection_size
@@ -201,52 +201,88 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
         return term1*term2
 
 
-    def evaluate_query(self, query_n, docs_ids):
+    def evaluate_query(self, query_n, docs_ids, latency):
         #initiate counts at 0
         fp = 0
         tp = 0
         fn = 0
 
-        #Open queries relevance
-        with open('../content/queries.relevance.filtered.txt','r') as q_f:
-            for q_relevance in q_f.readlines():
-                query_relevance_array = q_relevance.split(" ") # 1st is query number, 2nd is document id, 3rd is relevance
-                
-                if int(query_relevance_array[0]) == query_n:
-                    # if relevant and not showing up - FN
-                    if int(query_relevance_array[2]) > 0 and query_relevance_array[1] not in docs_ids:
-                        fn += 1
+        for i in range(0,3):
 
-                    # if showing up but not relevant - FP
-                    if int(query_relevance_array[2]) == 0 and query_relevance_array[1] in docs_ids:
-                        fp += 1
+            if i==0:
+                docs_ids_new = docs_ids[:10]
+            elif i==1:
+                docs_ids_new = docs_ids[:20]
+            elif i==2:
+                docs_ids_new = docs_ids[:50]
 
-                    # if showing up and relevant - TP
-                    if int(query_relevance_array[2]) > 0 and query_relevance_array[1] in docs_ids:
-                        tp += 1                    
-                
-                elif int(query_relevance_array[0]) > query_n:
-                    continue
-        
-            # returned values
-            # TODO, are the special cases necessary?
-            try:
-                precision = tp / (fp + tp)
-            except ZeroDivisionError:
-                precision = 0
+            #Open queries relevance
+            with open('../content/queries.relevance.filtered.txt','r') as q_f:
+                for q_relevance in q_f.readlines():
+                    query_relevance_array = q_relevance.split(" ") # 1st is query number, 2nd is document id, 3rd is relevance
+                    
+                    if int(query_relevance_array[0]) == query_n:
+                        # if relevant and not showing up - FN
+                        if int(query_relevance_array[2]) > 0 and query_relevance_array[1] not in docs_ids_new:
+                            fn += 1
+
+                        # if showing up but not relevant - FP
+                        if int(query_relevance_array[2]) == 0 and query_relevance_array[1] in docs_ids_new:
+                            fp += 1
+
+                        # if showing up and relevant - TP
+                        if int(query_relevance_array[2]) > 0 and query_relevance_array[1] in docs_ids_new:
+                            tp += 1                    
+                    
+                    elif int(query_relevance_array[0]) > query_n:
+                        break
             
-            try:
-                recall = tp / ( tp + fn)
-            except ZeroDivisionError:
-                recall = 0
+                # returned values
+                # TODO, are the special cases necessary?
+                try:
+                    precision = tp / (fp + tp)
+                except ZeroDivisionError:
+                    precision = 0
                 
-            if recall + precision == 0:
-                f_score = 0
-            else:
-                f_score = (2 * recall * precision) / (recall + precision)
+                try:
+                    recall = tp / ( tp + fn)
+                except ZeroDivisionError:
+                    recall = 0
+                    
+                if recall + precision == 0:
+                    f_score = 0
+                else:
+                    f_score = (2 * recall * precision) / (recall + precision)
 
+                # average precision
+                ap = 1
+
+                # ndcg
+                ndcg = 6.19
+
+                #do the same but for calculating recall
+                if i==0:
+                    recall_10 = recall
+                    precision_10 = precision
+                    f_10 = f_score
+                    ap_10 = ap
+                    ndcg_10 = ndcg
+                elif i==1:
+                    recall_20 = recall
+                    precision_20 = precision
+                    f_20 = f_score
+                    ap_20 = ap
+                    ndcg_20 = ndcg
+                elif i==2:
+                    recall_50 = recall
+                    precision_50 = precision
+                    f_50 = f_score
+                    ap_50 = ap
+                    ndcg_50 = ndcg
             
-            print("Query: %d  %.3f \t %.3f \t \t %.3f" % (query_n,precision,recall, f_score))
+        print("Query: %d  %.3f %.3f %.3f \t %.3f %.3f %.3f \t   %.3f %.3f %.3f \t   %.3f %.3f %.3f \t   %.3f %.3f %.3f \t %.0fms" % \
+            (query_n, precision_10,precision_20,precision_50, recall_10, recall_20, recall_50, f_10, f_20, f_50 \
+                ,ap_10,ap_20,ap_50, ndcg_10, ndcg_20, ndcg_50, latency*1000))
 
         return precision, recall, f_score
 
@@ -331,6 +367,5 @@ if __name__ == "__main__":  # maybe option -t simple or -t complex
     rtli.process_queries('../content/queries.txt',k1=k1, b=b,mode='bm25', docs_limit=50)
     #rtli.process_queries('queries.txt',mode='tf_idf')
     toc = time.time()
-    print("Time spent ranking documents: %.4fs" % (toc-tic))
 
     rtli.write_index_file()
