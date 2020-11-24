@@ -11,7 +11,6 @@ import collections
 """
 Authors:
 Tomás Costa - 89016  
-André Gual - 88751
 """
 
 
@@ -80,24 +79,36 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
                     for doc in best_docs:
                         print("Document: %s \t with relevance: %.5f" % (doc[0], doc[1]))
                     toc = time.time()
-                    print("\t Documents retrieved in %.4f seconds" % (toc-tic))
+                    print("\t Documents retrieved in %.0f ms" % ((toc-tic) *1000))
+
+
 
 
         elif mode=='bm25':
             #Show results for ranking
             with open(path,'r') as f:
+                query_n = 1
+                self.queries_results()
                 for query in f.readlines():
-                    print("Results for query: %s\n" % (query))
+                    #print("Results for query: %s\n" % (query))
                     tic = time.time()
                     best_docs = self.rank_bm25(query, k1, b, docs_limit)
-                    for doc in best_docs:
-                        print("Document: %s \t with score: %.5f" % (doc[0], doc[1]))
+                    #for doc in best_docs:
+                        #print("Document: %s \t with score: %.5f" % (doc[0], doc[1]))
                     toc = time.time()
-                    print("\t Documents retrieved in %.4f seconds" % (toc-tic))
+                    #print("\t Documents retrieved in %.4f ms" % ((toc-tic) *1000))
+
+                    docs_ids = [doc_id for doc_id, score in best_docs]
+                    
+                    # evaluate each query and print a table
+                    self.evaluate_query(query_n, docs_ids)
+                    query_n += 1
         else:
             usage()
             sys.exit(1)
 
+    def queries_results(self):
+        print("\tPrecision \tRecall	\tF-measure	\tAverage \tPrecision \tNDCG \tLatency\nQuery #	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50")
 
     def rank_tf_idf(self, query, docs_limit=10):
         # declaration of vars to be used in tf.idf
@@ -181,6 +192,56 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
         term1 = math.log(N/df)
         term2 = ((k1 + 1) * tf_doc) / ( k1 * ((1-b) + b*dl/avdl) + tf_doc )
         return term1*term2
+
+
+    def evaluate_query(self, query_n, docs_ids):
+        #initiate counts at 0
+        fp = 0
+        tp = 0
+        fn = 0
+
+        #Open queries relevance
+        with open('../content/queries.relevance.filtered.txt','r') as q_f:
+            for q_relevance in q_f.readlines():
+                query_relevance_array = q_relevance.split(" ") # 1st is query number, 2nd is document id, 3rd is relevance
+                
+                if int(query_relevance_array[0]) == query_n:
+                    # if relevant and not showing up - FN
+                    if int(query_relevance_array[2]) > 0 and query_relevance_array[1] not in docs_ids:
+                        fn += 1
+
+                    # if showing up but not relevant - FP
+                    if int(query_relevance_array[2]) == 0 and query_relevance_array[1] in docs_ids:
+                        fp += 1
+
+                    # if showing up and relevant - TP
+                    if int(query_relevance_array[2]) > 0 and query_relevance_array[1] in docs_ids:
+                        tp += 1                    
+                
+                elif int(query_relevance_array[0]) > query_n:
+                    continue
+        
+            # returned values
+            # TODO, are the special cases necessary?
+            try:
+                precision = tp / (fp + tp)
+            except ZeroDivisionError:
+                precision = 0
+            
+            try:
+                recall = tp / ( tp + fn)
+            except ZeroDivisionError:
+                recall = 0
+                
+            if recall + precision == 0:
+                f_score = 0
+            else:
+                f_score = (2 * recall * precision) / (recall + precision)
+
+            
+            print("Query: %d  %.3f \t %.3f \t \t %.3f" % (query_n,precision,recall, f_score))
+
+        return precision, recall, f_score
 
     def write_index_file(self, file_output='../output/indexed_map.txt'):
 
