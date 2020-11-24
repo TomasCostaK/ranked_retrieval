@@ -1,6 +1,8 @@
 from tokenizer import Tokenizer
 from indexer import Indexer
 import time
+
+from numpy import cumsum
 import sys
 import operator
 import os
@@ -116,7 +118,7 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
             sys.exit(1)
 
     def queries_results(self):
-        print("  \t\tPrecision \t\t Recall  	\tF-measure     \tAverage Precision \tNDCG \t\tLatency\nQuery #	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50")
+        print("  \t\tPrecision \t\t Recall  	\tF-measure     \tAverage Precision \tNDCG \t\t\tLatency\nQuery #	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50")
 
     def rank_tf_idf(self, query, docs_limit=10):
         # declaration of vars to be used in tf.idf
@@ -231,7 +233,7 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
                     
                     if int(query_relevance_array[0]) == query_n:
                         # treatment for ndcg
-                        relevance_ndcg.append(query_relevance_array[2])
+                        relevance_ndcg.append(float(query_relevance_array[2]))
 
                         # if relevant and not showing up - FN
                         if int(query_relevance_array[2]) > 0 and query_relevance_array[1] not in docs_ids_new:
@@ -271,16 +273,21 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
                     f_score = (2 * recall * precision) / (recall + precision)
 
                 # average precision
-                ap = sum(docs_ap)/len(docs_ap)
+                try:
+                    ap = sum(docs_ap)/len(docs_ap)
+                except ZeroDivisionError:
+                    ap = 0
 
                 # ndcg
-                ndcg_real = [relevance_ndcg[i]/(math.log2(i)) for i in range(len(relevance_ndcg))]
-                
-                relevance_ndcg = sorted(relevance_ndcg)
-                ndcg_ideal = [relevance_ndcg[i]/(math.log2(i)) for i in range(len(relevance_ndcg))]
-                ndcg = sum( ndcg_real/ndcg_ideal )
+                ndcg_real = [relevance_ndcg[0]] + [relevance_ndcg[i]/(math.log2(i+1)) for i in range(1,len(relevance_ndcg))]
+                ndcg_real = cumsum(ndcg_real)
 
-                print("NDCG REAL: ", ndcg_real)
+                relevance_ndcg = sorted(relevance_ndcg)
+                ndcg_ideal = [relevance_ndcg[0]] + [relevance_ndcg[i]/(math.log2(i+1)) for i in range(1,len(relevance_ndcg))]
+                ndcg_ideal = cumsum(ndcg_ideal)
+                
+                ndcg = sum([r / i if i!=0 else 0 for r,i in zip(ndcg_real, ndcg_ideal)])
+
                 #do the same but for calculating recall
                 if i==0:
                     recall_10 = recall
@@ -301,7 +308,7 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
                     ap_50 = ap
                     ndcg_50 = ndcg
             
-        print("Query: %d  %.3f %.3f %.3f \t %.3f %.3f %.3f \t   %.3f %.3f %.3f \t   %.3f %.3f %.3f \t   %.3f %.3f %.3f \t %.0fms" % \
+        print("Query: %d  %.3f %.3f %.3f \t %.3f %.3f %.3f \t   %.3f %.3f %.3f \t   %.3f %.3f %.3f \t   %.1f %.1f %.1f \t  %.0fms" % \
             (query_n, precision_10,precision_20,precision_50, recall_10, recall_20, recall_50, f_10, f_20, f_50 \
                 ,ap_10,ap_20,ap_50, ndcg_10, ndcg_20, ndcg_50, latency*1000))
 
