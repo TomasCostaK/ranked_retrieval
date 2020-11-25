@@ -118,7 +118,7 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
             sys.exit(1)
 
     def queries_results(self):
-        print("  \t\tPrecision \t\t Recall  	\tF-measure     \tAverage Precision \tNDCG \t\t\tLatency\nQuery #	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50")
+        print("  \t\tPrecision \t\t Recall  	\tF-measure     \tAverage Precision \tNDCG \t\t\t Latency\nQuery #	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50")
 
     def rank_tf_idf(self, query, docs_limit=10):
         # declaration of vars to be used in tf.idf
@@ -232,8 +232,6 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
                     query_relevance_array = q_relevance.split(" ") # 1st is query number, 2nd is document id, 3rd is relevance
                     
                     if int(query_relevance_array[0]) == query_n:
-                        # treatment for ndcg
-                        relevance_ndcg.append(float(query_relevance_array[2]))
 
                         # if relevant and not showing up - FN
                         if int(query_relevance_array[2]) > 0 and query_relevance_array[1] not in docs_ids_new:
@@ -242,6 +240,8 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
                         # if showing up but not relevant - FP
                         if int(query_relevance_array[2]) == 0 and query_relevance_array[1] in docs_ids_new:
                             fp += 1
+                            # treatment for ndcg
+                            relevance_ndcg.append(float(query_relevance_array[2])) 
 
                         # if showing up and relevant - TP
                         if int(query_relevance_array[2]) > 0 and query_relevance_array[1] in docs_ids_new:
@@ -250,7 +250,10 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
                                 temp_ap = tp / (fp + tp)
                             except ZeroDivisionError:
                                 temp_ap = 0
-                            docs_ap.append(temp_ap)                 
+                            docs_ap.append(temp_ap)      
+
+                            # treatment for ndcg
+                            relevance_ndcg.append(float(query_relevance_array[2]))           
                     
                     elif int(query_relevance_array[0]) > query_n:
                         break
