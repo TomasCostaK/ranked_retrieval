@@ -45,7 +45,6 @@ class Ranker:
    
     def process_queries(self, analyze_table=True):
         #Show results for ranking
-        tic_total = time.time()
         with open(self.queries_path,'r') as f:
             query_n = 1
             if analyze_table:
@@ -74,7 +73,6 @@ class Ranker:
                 # update query number
                 query_n += 1
         
-        toc_total = time.time()
         # calculate means, we do it like this, so its easier to read
         mean_precision = sum(self.mean_precision_array) / len(self.mean_precision_array)
         mean_recall = sum(self.mean_recall_array) / len(self.mean_recall_array)
@@ -84,10 +82,10 @@ class Ranker:
         mean_latency = sum(self.mean_latency_array) / len(self.mean_latency_array)
 
 
-        print("Median: \t %.3f \t\t\t %.3f \t\t\t  %.3f \t\t  %.3f \t\t  %.3f \t\t  %.0fms " % \
+        print("Median: \t %.3f \t\t\t %.3f \t\t\t  %.3f \t\t  %.3f \t\t  %.3f \t  %.0fms " % \
             (mean_precision, mean_recall, mean_f_measure, mean_ap, mean_ndcg, mean_latency*1000)
         )
-        print("Query throughput: %.3f queries per second" % ( 1 * 50 / (toc_total-tic_total) ))
+        print("Query throughput: %.3f queries per second" % ( 1 * 1000 / (mean_latency * 1000) ))
 
     def queries_results(self):
         print("  \t\tPrecision \t\t Recall  	\tF-measure     \tAverage Precision \tNDCG \t\t\t Latency\nQuery #	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50")
@@ -147,7 +145,6 @@ class Ranker:
             df = self.indexed_map[term]['doc_freq']
 
             # calculate idf for each term
-            # TODO, ask teacher if this IDF is calculated well
             idf = self.indexed_map[term]['idf']
 
             avdl = sum([ value for key,value in self.docs_length.items()]) / self.collection_size
@@ -155,7 +152,7 @@ class Ranker:
             for doc_id, tf_doc in self.indexed_map[term]['doc_ids'].items():
                 dl = self.docs_length[doc_id]
                 score = self.calculate_BM25(df, dl, avdl, tf_doc)
-                best_docs[doc_id] += score
+                best_docs[doc_id] += score * idf
         
         most_relevant_docs = sorted(best_docs.items(), key=lambda x: x[1], reverse=True)
         return most_relevant_docs[:self.docs_limit]
