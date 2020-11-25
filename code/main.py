@@ -71,9 +71,9 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
                 #print("Estimated indexing time: %.4fs" % (toc-tic)) #useful for debugging
 
         self.indexed_map = self.indexer.getIndexed()
-        self.updateIdfs()
 
     def rank(self, analyze_table, tokenizer_mode):
+        self.updateIdfs()
         self.ranker.update(self.docs_length, self.collection_size, self.indexed_map, tokenizer_mode, "../content/snowball_stopwords_EN.txt")
         self.ranker.process_queries(analyze_table=analyze_table)
 
@@ -141,9 +141,9 @@ def usage():
 if __name__ == "__main__":  
 
     # work nº2 defaults
-    mode = 'tf_idf'
+    mode = 'bm25'
     analyze_table = True
-    docs_limit = 20
+    docs_limit = 50
     tokenizer_mode = 'complex'
 
     if len(sys.argv) < 3:

@@ -97,8 +97,6 @@ class Ranker:
 
         # Special call to indexer, so we can access the term frequency, making use of modularization
         indexed_query = self.indexer.index_query(self.tokenizer.tokenize(query,-1))
-        query_weights_list = []
-        documents_weights_list = []
 
         for term,tf_query in indexed_query.items():
             #special treatment, weights at 0
@@ -110,20 +108,13 @@ class Ranker:
             idf = self.indexed_map[term]['idf']
 
             weight_query_term = tf_weight * idf #this is the weight for the term in the query
-            query_weights_list.append(weight_query_term)
 
             # now we iterate over every term
             for doc_id, tf_doc in self.indexed_map[term]['doc_ids'].items():
                 tf_doc_weight = math.log10(tf_doc) + 1
-                documents_weights_list.append(tf_doc_weight)
-                best_docs[doc_id] += (weight_query_term * tf_doc_weight) 
+                score = (weight_query_term * tf_doc_weight) / self.docs_length[doc_id]
+                best_docs[doc_id] += score
         
-        # TODO, this normalization is wrong, see where i can add the doc_length
-        length_normalize = math.sqrt(sum([x**2 for x in query_weights_list])) * math.sqrt(sum([x**2 for x in documents_weights_list]))
-            
-        #find a better way to normalize data
-        for k, v in best_docs.items():
-            best_docs[k] = v/length_normalize
         
         most_relevant_docs = sorted(best_docs.items(), key=lambda x: x[1], reverse=True)
         return most_relevant_docs[:self.docs_limit]
@@ -152,7 +143,7 @@ class Ranker:
             for doc_id, tf_doc in self.indexed_map[term]['doc_ids'].items():
                 dl = self.docs_length[doc_id]
                 score = self.calculate_BM25(df, dl, avdl, tf_doc)
-                best_docs[doc_id] += score # TODO, when we multiplied here by IDF, we got better results
+                best_docs[doc_id] += score 
         
         most_relevant_docs = sorted(best_docs.items(), key=lambda x: x[1], reverse=True)
         return most_relevant_docs[:self.docs_limit]
@@ -243,14 +234,17 @@ class Ranker:
                     ap = 0
 
                 # ndcg
-                ndcg_real = [relevance_ndcg[0]] + [relevance_ndcg[i]/(math.log2(i+1)) for i in range(1,len(relevance_ndcg))]
-                ndcg_real = cumsum(ndcg_real)
+                if len(relevance_ndcg) > 0:
+                    ndcg_real = [relevance_ndcg[0]] + [relevance_ndcg[i] for i in range(1,len(relevance_ndcg))]
+                    ndcg_real = cumsum(ndcg_real)
 
-                relevance_ndcg = sorted(relevance_ndcg)
-                ndcg_ideal = [relevance_ndcg[0]] + [relevance_ndcg[i]/(math.log2(i+1)) for i in range(1,len(relevance_ndcg))]
-                ndcg_ideal = cumsum(ndcg_ideal)
-                
-                ndcg = sum([r / i if i!=0 else 0 for r,i in zip(ndcg_real, ndcg_ideal)])
+                    relevance_ndcg = sorted(relevance_ndcg, reverse=True)
+                    ndcg_ideal = [relevance_ndcg[0]] + [relevance_ndcg[i]/(math.log2(i+1)) for i in range(1,len(relevance_ndcg))]
+                    ndcg_ideal = cumsum(ndcg_ideal)
+                    
+                    ndcg = [r / i if i!=0 else 0 for r,i in zip(ndcg_real, ndcg_ideal)][-1]
+                else:
+                    ndcg = 0
 
                 #do the same but for calculating recall
                 if i==0:
