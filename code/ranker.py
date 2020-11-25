@@ -152,7 +152,7 @@ class Ranker:
             for doc_id, tf_doc in self.indexed_map[term]['doc_ids'].items():
                 dl = self.docs_length[doc_id]
                 score = self.calculate_BM25(df, dl, avdl, tf_doc)
-                best_docs[doc_id] += score * idf
+                best_docs[doc_id] += score # TODO, when we multiplied here by IDF, we got better results
         
         most_relevant_docs = sorted(best_docs.items(), key=lambda x: x[1], reverse=True)
         return most_relevant_docs[:self.docs_limit]
@@ -160,7 +160,7 @@ class Ranker:
     # auxiliary function to calculate bm25 formula
     def calculate_BM25(self, df, dl, avdl, tf_doc):
         N = self.collection_size
-        term1 = math.log(N/df)
+        term1 = math.log(N/df) #acts as idf
         term2 = ((self.k1 + 1) * tf_doc) / ( self.k1 * ((1-self.b) + self.b*dl/avdl) + tf_doc )
         return term1*term2
 

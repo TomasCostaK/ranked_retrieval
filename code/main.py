@@ -141,7 +141,7 @@ def usage():
 if __name__ == "__main__":  
 
     # work nº2 defaults
-    mode = 'bm25'
+    mode = 'tf_idf'
     analyze_table = True
     docs_limit = 20
     tokenizer_mode = 'complex'
