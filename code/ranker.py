@@ -27,6 +27,15 @@ class Ranker:
         # used in ranking to check each documents length, and the average of all docs
         self.docs_length = docs_length
 
+        # arrays used to calculate means
+        self.mean_precision_array = []
+        self.mean_recall_array = []
+        self.mean_f_measure_array = []
+        self.mean_ap_array = []
+        self.mean_ndcg_array = []
+        self.mean_latency_array = []
+
+
     def update(self, docs_len, collection_size, indexed_words, tokenizer_mode, stopwords_file):
         self.docs_length = docs_len
         # atributes used in calculus
@@ -36,6 +45,7 @@ class Ranker:
    
     def process_queries(self, analyze_table=True):
         #Show results for ranking
+        tic_total = time.time()
         with open(self.queries_path,'r') as f:
             query_n = 1
             if analyze_table:
@@ -63,6 +73,21 @@ class Ranker:
                 
                 # update query number
                 query_n += 1
+        
+        toc_total = time.time()
+        # calculate means, we do it like this, so its easier to read
+        mean_precision = sum(self.mean_precision_array) / len(self.mean_precision_array)
+        mean_recall = sum(self.mean_recall_array) / len(self.mean_recall_array)
+        mean_f_measure = sum(self.mean_f_measure_array) / len(self.mean_f_measure_array)
+        mean_ap = sum(self.mean_ap_array) / len(self.mean_ap_array)
+        mean_ndcg = sum(self.mean_ndcg_array) / len(self.mean_ndcg_array)
+        mean_latency = sum(self.mean_latency_array) / len(self.mean_latency_array)
+
+
+        print("Median: \t %.3f \t\t\t %.3f \t\t\t  %.3f \t\t  %.3f \t\t  %.3f \t\t  %.0fms " % \
+            (mean_precision, mean_recall, mean_f_measure, mean_ap, mean_ndcg, mean_latency*1000)
+        )
+        print("Query throughput: %.3f queries per second" % ( 1 * 50 / (toc_total-tic_total) ))
 
     def queries_results(self):
         print("  \t\tPrecision \t\t Recall  	\tF-measure     \tAverage Precision \tNDCG \t\t\t Latency\nQuery #	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50")
@@ -249,12 +274,20 @@ class Ranker:
                     f_50 = f_score
                     ap_50 = ap
                     ndcg_50 = ndcg
+
+                    # we also add the values to the array of 50 docs
+                    self.mean_precision_array.append(precision)
+                    self.mean_recall_array.append(recall)
+                    self.mean_f_measure_array.append(f_score)
+                    self.mean_ap_array.append(ap)
+                    self.mean_ndcg_array.append(ndcg)
+                    self.mean_latency_array.append(latency)
             
         print("Query: %d  %.3f %.3f %.3f \t %.3f %.3f %.3f \t   %.3f %.3f %.3f \t   %.3f %.3f %.3f \t   %.1f %.1f %.1f \t  %.0fms" % \
             (query_n, precision_10,precision_20,precision_50, recall_10, recall_20, recall_50, f_10, f_20, f_50 \
                 ,ap_10,ap_20,ap_50, ndcg_10, ndcg_20, ndcg_50, latency*1000))
 
-        return precision, recall, f_score
+        return None
 
 def usage():
     print("Usage: python3 main.py <tokenizer_mode: complex/simple> <chunksize:int> <ranking_mode:tf_idf/bm25> <analyze_flag:boolean>")
