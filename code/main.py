@@ -1,5 +1,6 @@
 from tokenizer import Tokenizer
 from indexer import Indexer
+from ranker import Ranker
 import time
 
 from numpy import cumsum
@@ -17,9 +18,10 @@ Tomás Costa - 89016
 
 
 class RTLI:  # Reader, tokenizer, linguistic, indexer
-    def __init__(self, tokenizer_mode, file='../content/metadata_2020-03-27.csv', stopwords_file="../content/snowball_stopwords_EN.txt", chunksize=10000):
+    def __init__(self, tokenizer_mode, file='../content/metadata_2020-03-27.csv', stopwords_file="../content/snowball_stopwords_EN.txt", chunksize=10000, queries_path='../content/queries.txt' ,rank_mode='bm25', docs_limit=50):
         self.tokenizer = Tokenizer(tokenizer_mode, stopwords_file)
         self.indexer = Indexer()
+        self.ranker = Ranker(queries_path=queries_path ,mode=rank_mode,docs_limit=docs_limit)
         self.file = file
 
         # defines the number of lines to be read at once
@@ -34,7 +36,7 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
         # collection size
         self.collection_size = 0
 
-
+    # auxiliary function to generate chunks of text to read
     def gen_chunks(self, reader):
         chunk = []
         for i, line in enumerate(reader):
@@ -44,6 +46,7 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
             chunk.append(line)
         yield chunk
 
+    # main function of indexing and tokenizing
     def process(self):
         tokens = []
 
@@ -70,6 +73,10 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
         self.indexed_map = self.indexer.getIndexed()
         self.updateIdfs()
 
+    def rank(self, analyze_table, tokenizer_mode):
+        self.ranker.update(self.docs_length, self.collection_size, self.indexed_map, tokenizer_mode, "../content/snowball_stopwords_EN.txt")
+        self.ranker.process_queries(analyze_table=analyze_table)
+
     # we call this extra step, so every term has an idf
     def updateIdfs(self):
         for term, value in self.indexed_map.items():
@@ -77,254 +84,15 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
             self.indexed_map[term]['idf'] = idf
 
 
-    def process_queries(self, path='../content/queries.txt', mode='tf_idf', k1=1.2, b=0.75 ,docs_limit=10):
-        if mode=='tf_idf':
-            #Show results for ranking
-            with open(path,'r') as f:
-                for query in f.readlines():
-                    print("\nResults for query: %s\n" % (query))
-                    tic = time.time()
-                    best_docs = self.rank_tf_idf(query,docs_limit)
-                    for doc in best_docs:
-                        print("Document: %s \t with relevance: %.5f" % (doc[0], doc[1]))
-                    toc = time.time()
-                    print("\t Documents retrieved in %.0f ms" % ((toc-tic) *1000))
-
-
-
-
-        elif mode=='bm25':
-            #Show results for ranking
-            with open(path,'r') as f:
-                query_n = 1
-                self.queries_results()
-                for query in f.readlines():
-                    #print("Results for query: %s\n" % (query))
-                    tic = time.time()
-                    best_docs = self.rank_bm25(query, k1, b, docs_limit)
-                    #for doc in best_docs:
-                        #print("Document: %s \t with score: %.5f" % (doc[0], doc[1]))
-                    toc = time.time()
-                    #print("\t Documents retrieved in %.4f ms" % ((toc-tic) *1000))
-
-                    docs_ids = [doc_id for doc_id, score in best_docs]
-                    
-                    # evaluate each query and print a table
-                    #TODO here, evaluate for each of the 10, 20, 50
-                    self.evaluate_query(query_n, docs_ids, toc-tic)
-                    query_n += 1
-        else:
-            usage()
-            sys.exit(1)
-
-    def queries_results(self):
-        print("  \t\tPrecision \t\t Recall  	\tF-measure     \tAverage Precision \tNDCG \t\t\t Latency\nQuery #	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50")
-
-    def rank_tf_idf(self, query, docs_limit=10):
-        # declaration of vars to be used in tf.idf
-        best_docs = collections.defaultdict(lambda: 0) # default start at 0 so we can do cumulative gains
-        N = self.collection_size
-
-        # Special call to indexer, so we can access the term frequency, making use of modularization
-        indexed_query = self.indexer.index_query(self.tokenizer.tokenize(query,-1))
-        query_weights_list = []
-        documents_weights_list = []
-
-        for term,tf_query in indexed_query.items():
-            #special treatment, weights at 0
-            if term not in self.indexed_map.keys():
-                continue
-            
-            tf_weight = math.log10(tf_query) + 1
-            df = self.indexed_map[term]['doc_freq']
-            idf = self.indexed_map[term]['idf']
-
-            weight_query_term = tf_weight * idf #this is the weight for the term in the query
-            query_weights_list.append(weight_query_term)
-
-            # now we iterate over every term
-            for doc_id, tf_doc in self.indexed_map[term]['doc_ids'].items():
-                tf_doc_weight = math.log10(tf_doc) + 1
-                documents_weights_list.append(tf_doc_weight)
-                
-                """ #TODO these calculus are wrong in the calculator, talk to prof
-                documents_weights_list = [0,1.3,2,3]
-                query_weights_list = [1,0,1,1.3]
-                #normalization step
-                """
-                best_docs[doc_id] += (weight_query_term * tf_doc_weight) 
-        
-        # TODO, this normalization is wrong, see where i can add the doc_length
-        length_normalize = math.sqrt(sum([x**2 for x in query_weights_list])) * math.sqrt(sum([x**2 for x in documents_weights_list]))
-            
-        #find a better way to normalize data
-        for k, v in best_docs.items():
-            best_docs[k] = v/length_normalize
-        
-        most_relevant_docs = sorted(best_docs.items(), key=lambda x: x[1], reverse=True)
-        return most_relevant_docs[:docs_limit]
-
-
-    def rank_bm25(self, query, k1, b, docs_limit=50):
-        # declaration of vars to be used in tf.idf
-        best_docs = collections.defaultdict(lambda: 0) # default start at 0 so we can do cumulative gains
-        N = self.collection_size
-
-        # Special call to indexer, so we can access the term frequency, making use of modularization
-        indexed_query = self.indexer.index_query(self.tokenizer.tokenize(query,-1))
-
-        for term,tf_query in indexed_query.items():
-            #special treatment, weights at 0
-            if term not in self.indexed_map.keys():
-                continue
-
-            df = self.indexed_map[term]['doc_freq']
-
-            # calculate idf for each term
-            # TODO, ask teacher if this IDF is calculated well
-            idf = self.indexed_map[term]['idf']
-
-            avdl = sum([ value for key,value in self.docs_length.items()]) / self.collection_size
-            # now we iterate over every term
-            for doc_id, tf_doc in self.indexed_map[term]['doc_ids'].items():
-                dl = self.docs_length[doc_id]
-                score = self.calculate_BM25(df, k1, b, dl, avdl, tf_doc)
-                best_docs[doc_id] += score
-        
-        most_relevant_docs = sorted(best_docs.items(), key=lambda x: x[1], reverse=True)
-        return most_relevant_docs[:docs_limit]
-
-    def calculate_BM25(self, df, k1, b, dl, avdl, tf_doc):
-        N = self.collection_size
-
-        #TODO, confirm this is correct
-        term1 = math.log(N/df)
-        term2 = ((k1 + 1) * tf_doc) / ( k1 * ((1-b) + b*dl/avdl) + tf_doc )
-        return term1*term2
-
-
-    def evaluate_query(self, query_n, docs_ids, latency):
-        #initiate counts at 0
-        fp = 0
-        tp = 0
-        fn = 0
-
-        for i in range(0,3):
-
-            if i==0:
-                docs_ids_new = docs_ids[:10]
-            elif i==1:
-                docs_ids_new = docs_ids[:20]
-            elif i==2:
-                docs_ids_new = docs_ids[:50]
-
-            #Open queries relevance
-            with open('../content/queries.relevance.filtered.txt','r') as q_f:
-                # variables for average precision
-                doc_counter = 0
-                docs_ap = []
-
-                # variables for ndcg
-                relevance_ndcg = []
-
-                for q_relevance in q_f.readlines():
-                    
-                    query_relevance_array = q_relevance.split(" ") # 1st is query number, 2nd is document id, 3rd is relevance
-                    
-                    if int(query_relevance_array[0]) == query_n:
-
-                        # if relevant and not showing up - FN
-                        if int(query_relevance_array[2]) > 0 and query_relevance_array[1] not in docs_ids_new:
-                            fn += 1
-
-                        # if showing up but not relevant - FP
-                        if int(query_relevance_array[2]) == 0 and query_relevance_array[1] in docs_ids_new:
-                            fp += 1
-                            # treatment for ndcg
-                            relevance_ndcg.append(float(query_relevance_array[2])) 
-
-                        # if showing up and relevant - TP
-                        if int(query_relevance_array[2]) > 0 and query_relevance_array[1] in docs_ids_new:
-                            tp += 1   
-                            try:
-                                temp_ap = tp / (fp + tp)
-                            except ZeroDivisionError:
-                                temp_ap = 0
-                            docs_ap.append(temp_ap)      
-
-                            # treatment for ndcg
-                            relevance_ndcg.append(float(query_relevance_array[2]))           
-                    
-                    elif int(query_relevance_array[0]) > query_n:
-                        break
-            
-                # returned values
-                # TODO, are the special cases necessary?
-                try:
-                    precision = tp / (fp + tp)
-                except ZeroDivisionError:
-                    precision = 0
-                
-                try:
-                    recall = tp / ( tp + fn)
-                except ZeroDivisionError:
-                    recall = 0
-                    
-                if recall + precision == 0:
-                    f_score = 0
-                else:
-                    f_score = (2 * recall * precision) / (recall + precision)
-
-                # average precision
-                try:
-                    ap = sum(docs_ap)/len(docs_ap)
-                except ZeroDivisionError:
-                    ap = 0
-
-                # ndcg
-                ndcg_real = [relevance_ndcg[0]] + [relevance_ndcg[i]/(math.log2(i+1)) for i in range(1,len(relevance_ndcg))]
-                ndcg_real = cumsum(ndcg_real)
-
-                relevance_ndcg = sorted(relevance_ndcg)
-                ndcg_ideal = [relevance_ndcg[0]] + [relevance_ndcg[i]/(math.log2(i+1)) for i in range(1,len(relevance_ndcg))]
-                ndcg_ideal = cumsum(ndcg_ideal)
-                
-                ndcg = sum([r / i if i!=0 else 0 for r,i in zip(ndcg_real, ndcg_ideal)])
-
-                #do the same but for calculating recall
-                if i==0:
-                    recall_10 = recall
-                    precision_10 = precision
-                    f_10 = f_score
-                    ap_10 = ap
-                    ndcg_10 = ndcg
-                elif i==1:
-                    recall_20 = recall
-                    precision_20 = precision
-                    f_20 = f_score
-                    ap_20 = ap
-                    ndcg_20 = ndcg
-                elif i==2:
-                    recall_50 = recall
-                    precision_50 = precision
-                    f_50 = f_score
-                    ap_50 = ap
-                    ndcg_50 = ndcg
-            
-        print("Query: %d  %.3f %.3f %.3f \t %.3f %.3f %.3f \t   %.3f %.3f %.3f \t   %.3f %.3f %.3f \t   %.1f %.1f %.1f \t  %.0fms" % \
-            (query_n, precision_10,precision_20,precision_50, recall_10, recall_20, recall_50, f_10, f_20, f_50 \
-                ,ap_10,ap_20,ap_50, ndcg_10, ndcg_20, ndcg_50, latency*1000))
-
-        return precision, recall, f_score
-
+    # function to write indexed terms to file, in a similar output to the one requested
     def write_index_file(self, file_output='../output/indexed_map.txt'):
-
         with open(file_output,'w+') as f:
             for term, value in self.indexed_map.items(): 
                 string = term + ": " + str(value) + '\n'
                 f.write(string)
 
 
+    # Questions being asked in work nº1
     def domain_questions(self, time):
         # Question a)
         mem_size = self.calculate_dict_size(self.indexed_map) / 1024 / 1024
@@ -355,7 +123,7 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
         for term in ten_most_frequent:
             print(term)
 
-
+    # auxiliary function to calculate dict size recursively
     def calculate_dict_size(self, input_dict):
         mem_size = 0
         for key, value in input_dict.items():
@@ -368,19 +136,25 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
         return mem_size + sys.getsizeof(input_dict)
 
 def usage():
-    print("Usage: python3 main.py <complex/simple> <chunksize>")
+    print("Usage: python3 main.py <tokenizer_mode: complex/simple> <chunksize:int> <ranking_mode:tf_idf/bm25> <analyze_table:boolean>")
 
-if __name__ == "__main__":  # maybe option -t simple or -t complex
+if __name__ == "__main__":  
+
+    # work nº2 defaults
+    mode = 'bm25'
+    analyze_table = True
+    docs_limit = 20
+    tokenizer_mode = 'complex'
 
     if len(sys.argv) < 3:
         usage()
         sys.exit(1)
 
     if sys.argv[1] == "complex":
-        rtli = RTLI(tokenizer_mode="complex",chunksize=int(sys.argv[2]))
+        rtli = RTLI(tokenizer_mode="complex",chunksize=int(sys.argv[2]), rank_mode=mode, docs_limit=docs_limit)
 
     elif sys.argv[1] == "simple":
-        rtli = RTLI(tokenizer_mode="simple",chunksize=int(sys.argv[2]))
+        rtli = RTLI(tokenizer_mode="simple",chunksize=int(sys.argv[2]), rank_mode=mode, docs_limit=docs_limit)
 
     else:
         print("Usage: python3 main.py <complex/simple> <chunksize>")
@@ -391,12 +165,10 @@ if __name__ == "__main__":  # maybe option -t simple or -t complex
     toc = time.time()
 
     rtli.domain_questions(toc-tic)
-    
+
+
     tic = time.time()
-    k1 = 1.2
-    b = 0.75
-    rtli.process_queries('../content/queries.txt',k1=k1, b=b,mode='bm25', docs_limit=50)
-    #rtli.process_queries('queries.txt',mode='tf_idf')
+    rtli.rank(analyze_table, tokenizer_mode)
     toc = time.time()
 
     rtli.write_index_file()
