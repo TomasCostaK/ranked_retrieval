@@ -90,7 +90,7 @@ class Ranker:
             median_ndcg = np.median(self.mean_ndcg_array)
             median_latency = np.median(self.mean_latency_array)
 
-            print("Median: \t %.3f \t\t\t %.3f \t\t\t  %.3f \t\t  %.3f \t\t  %.3f \t  %.0fms " % \
+            print("Median @50: \t %.3f \t\t\t %.3f \t\t\t  %.3f \t\t  %.3f \t\t  %.3f \t  %.0fms " % \
                 (median_precision, median_recall, median_f_measure, median_ap, median_ndcg, median_latency*1000)
             )
             print("Query throughput: %.3f queries per second" % ( 1 * 1000 / (median_latency * 1000) ))
