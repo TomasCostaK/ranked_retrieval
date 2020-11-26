@@ -137,7 +137,7 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
         return mem_size + sys.getsizeof(input_dict)
 
 def usage():
-    print("Usage: python3 main.py \n\t-t <tokenizer_mode: complex/simple> \n\t-c <chunksize:int> \n\t-r <ranking_mode:tf_idf/bm25> \n\t-a <analyze_table:boolean>")
+    print("Usage: python3 main.py \n\t-t <tokenizer_mode: complex/simple> \n\t-c <chunksize:int>\n\t-n <limit of docs returned:int> \n\t-r <ranking_mode:tf_idf/bm25> \n\t-a <analyze_table:boolean>")
 
 if __name__ == "__main__":  
 
@@ -153,7 +153,7 @@ if __name__ == "__main__":
 
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "ht:c:r:a", ["help", "output="])
+        opts, args = getopt.getopt(sys.argv[1:], "ht:c:r:an:", ["help", "output="])
     except getopt.GetoptError as err:
         # print help information and exit:
         print(str(err))  # will print something like "option -a not recognized"
@@ -175,6 +175,14 @@ if __name__ == "__main__":
             try:
                 chunksize = int(a)
                 assert int(a)>1, "chunksize bigger than 1"
+            except:
+                usage()
+                sys.exit()
+            
+        elif o == "-n":
+            try:
+                docs_limit = int(a)
+                assert int(a)>1, "docs_limit bigger than 1"
             except:
                 usage()
                 sys.exit()

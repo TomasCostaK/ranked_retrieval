@@ -73,19 +73,20 @@ class Ranker:
                 # update query number
                 query_n += 1
         
-        # calculate means, we do it like this, so its easier to read
-        mean_precision = sum(self.mean_precision_array) / len(self.mean_precision_array)
-        mean_recall = sum(self.mean_recall_array) / len(self.mean_recall_array)
-        mean_f_measure = sum(self.mean_f_measure_array) / len(self.mean_f_measure_array)
-        mean_ap = sum(self.mean_ap_array) / len(self.mean_ap_array)
-        mean_ndcg = sum(self.mean_ndcg_array) / len(self.mean_ndcg_array)
-        mean_latency = sum(self.mean_latency_array) / len(self.mean_latency_array)
+        if analyze_table:
+            # calculate means, we do it like this, so its easier to read
+            mean_precision = sum(self.mean_precision_array) / len(self.mean_precision_array)
+            mean_recall = sum(self.mean_recall_array) / len(self.mean_recall_array)
+            mean_f_measure = sum(self.mean_f_measure_array) / len(self.mean_f_measure_array)
+            mean_ap = sum(self.mean_ap_array) / len(self.mean_ap_array)
+            mean_ndcg = sum(self.mean_ndcg_array) / len(self.mean_ndcg_array)
+            mean_latency = sum(self.mean_latency_array) / len(self.mean_latency_array)
 
 
-        print("Median: \t %.3f \t\t\t %.3f \t\t\t  %.3f \t\t  %.3f \t\t  %.3f \t  %.0fms " % \
-            (mean_precision, mean_recall, mean_f_measure, mean_ap, mean_ndcg, mean_latency*1000)
-        )
-        print("Query throughput: %.3f queries per second" % ( 1 * 1000 / (mean_latency * 1000) ))
+            print("Median: \t %.3f \t\t\t %.3f \t\t\t  %.3f \t\t  %.3f \t\t  %.3f \t  %.0fms " % \
+                (mean_precision, mean_recall, mean_f_measure, mean_ap, mean_ndcg, mean_latency*1000)
+            )
+            print("Query throughput: %.3f queries per second" % ( 1 * 1000 / (mean_latency * 1000) ))
 
     def queries_results(self):
         print("  \t\tPrecision \t\t Recall  	\tF-measure     \tAverage Precision \tNDCG \t\t\t Latency\nQuery #	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50")
