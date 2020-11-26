@@ -3,6 +3,7 @@ from indexer import Indexer
 from tokenizer import Tokenizer
 
 import sys
+import numpy as np
 import time
 import math
 import collections
@@ -80,19 +81,19 @@ class Ranker:
                 query_n += 1
         
         if analyze_table:
-            # calculate means, we do it like this, so its easier to read
-            mean_precision = sum(self.mean_precision_array) / len(self.mean_precision_array)
-            mean_recall = sum(self.mean_recall_array) / len(self.mean_recall_array)
-            mean_f_measure = sum(self.mean_f_measure_array) / len(self.mean_f_measure_array)
-            mean_ap = sum(self.mean_ap_array) / len(self.mean_ap_array)
-            mean_ndcg = sum(self.mean_ndcg_array) / len(self.mean_ndcg_array)
-            mean_latency = sum(self.mean_latency_array) / len(self.mean_latency_array)
 
+            # calculate medians, we do it like this, so its easier to read, np was the most efficient way
+            median_precision = np.median(self.mean_precision_array)
+            median_recall = np.median(self.mean_recall_array)
+            median_f_measure = np.median(self.mean_f_measure_array)
+            median_ap = np.median(self.mean_ap_array)
+            median_ndcg = np.median(self.mean_ndcg_array)
+            median_latency = np.median(self.mean_latency_array)
 
             print("Median: \t %.3f \t\t\t %.3f \t\t\t  %.3f \t\t  %.3f \t\t  %.3f \t  %.0fms " % \
-                (mean_precision, mean_recall, mean_f_measure, mean_ap, mean_ndcg, mean_latency*1000)
+                (median_precision, median_recall, median_f_measure, median_ap, median_ndcg, median_latency*1000)
             )
-            print("Query throughput: %.3f queries per second" % ( 1 * 1000 / (mean_latency * 1000) ))
+            print("Query throughput: %.3f queries per second" % ( 1 * 1000 / (median_latency * 1000) ))
 
     def queries_results(self):
         print("  \t\tPrecision \t\t Recall  	\tF-measure     \tAverage Precision \tNDCG \t\t\t Latency\nQuery #	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50")
