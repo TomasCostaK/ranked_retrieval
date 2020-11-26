@@ -89,7 +89,7 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
     def write_index_file(self, file_output='../output/indexed_map.txt'):
         with open(file_output,'w+') as f:
             for term, value in self.indexed_map.items(): 
-                string = term + ": " + str(value) + '\n'
+                string = term + ": " +  str(value['idf']) + '; ' +  str(value['doc_ids']) + '\n'
                 f.write(string)
 
 
