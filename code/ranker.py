@@ -42,6 +42,9 @@ class Ranker:
         self.indexed_map = indexed_words
         self.collection_size = collection_size
         self.tokenizer = Tokenizer(tokenizer_mode, stopwords_file)
+
+        #update documents length
+        self.avdl = sum([ value for key,value in self.docs_length.items()]) / self.collection_size
    
     def process_queries(self, analyze_table=True):
         #Show results for ranking
@@ -139,12 +142,11 @@ class Ranker:
             # calculate idf for each term
             idf = self.indexed_map[term]['idf']
 
-            avdl = sum([ value for key,value in self.docs_length.items()]) / self.collection_size
             # now we iterate over every term
             for doc_id, tf_doc in self.indexed_map[term]['doc_ids'].items():
                 dl = self.docs_length[doc_id]
-                score = self.calculate_BM25(df, dl, avdl, tf_doc)
-                best_docs[doc_id] += score 
+                score = self.calculate_BM25(df, dl, self.avdl, tf_doc)
+                best_docs[doc_id] += idf * score 
         
         most_relevant_docs = sorted(best_docs.items(), key=lambda x: x[1], reverse=True)
         return most_relevant_docs[:self.docs_limit]
@@ -152,9 +154,8 @@ class Ranker:
     # auxiliary function to calculate bm25 formula
     def calculate_BM25(self, df, dl, avdl, tf_doc):
         N = self.collection_size
-        term1 = math.log(N/df) #acts as idf
         term2 = ((self.k1 + 1) * tf_doc) / ( self.k1 * ((1-self.b) + self.b*dl/avdl) + tf_doc )
-        return term1*term2
+        return term2 #since, term1 is idf, and is calculated before
 
     def evaluate_query(self, query_n, docs_ids, latency):
         #initiate counts at 0
