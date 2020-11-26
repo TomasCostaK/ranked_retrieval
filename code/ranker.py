@@ -185,18 +185,22 @@ class Ranker:
 
             #Open queries relevance
             with open('../content/queries.relevance.filtered.txt','r') as q_f:
+
                 # variables for average precision
                 doc_counter = 0
                 docs_ap = []
+
+                #query_relevance array
+                docs_relevance_array = []
 
                 # variables for ndcg
                 relevance_ndcg = []
 
                 for q_relevance in q_f.readlines():
-                    
                     query_relevance_array = q_relevance.split(" ") # 1st is query number, 2nd is document id, 3rd is relevance
                     
                     if int(query_relevance_array[0]) == query_n:
+                        docs_relevance_array.append(query_relevance_array[1]) # append the id, to check for number that dont appear in relevance filter
 
                         # if relevant and not showing up - FN
                         if int(query_relevance_array[2]) > 0 and query_relevance_array[1] not in docs_ids_new:
@@ -222,9 +226,14 @@ class Ranker:
                     
                     elif int(query_relevance_array[0]) > query_n:
                         break
-            
+
+                n_outcasts = len(np.setdiff1d(docs_ids_new,docs_relevance_array)) # add the ones that are returned but not on the relevance file
+                fp += n_outcasts
+                
+                # we dont need to update the ndcg, since its 0s to the end, and wouldnt change its values
+
                 # returned values
-                # TODO, are the special cases necessary?
+                # are the special cases necessary?
                 try:
                     precision = tp / (fp + tp)
                 except ZeroDivisionError:
