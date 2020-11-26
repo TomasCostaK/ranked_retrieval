@@ -5,6 +5,7 @@ import time
 
 from numpy import cumsum
 import sys
+import getopt
 import operator
 import os
 import csv
@@ -136,37 +137,76 @@ class RTLI:  # Reader, tokenizer, linguistic, indexer
         return mem_size + sys.getsizeof(input_dict)
 
 def usage():
-    print("Usage: python3 main.py <tokenizer_mode: complex/simple> <chunksize:int> <ranking_mode:tf_idf/bm25> <analyze_table:boolean>")
+    print("Usage: python3 main.py \n\t-t <tokenizer_mode: complex/simple> \n\t-c <chunksize:int> \n\t-r <ranking_mode:tf_idf/bm25> \n\t-a <analyze_table:boolean>")
 
 if __name__ == "__main__":  
 
+    # work nº1 defaults
+    chunksize = 30000
+    tokenizer_mode = 'complex'
+
     # work nº2 defaults
-    mode = 'bm25'
-    analyze_table = True
+    rank_mode = 'bm25'
+    analyze_table = False
     docs_limit = 50
     tokenizer_mode = 'complex'
 
-    if len(sys.argv) < 3:
+
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "ht:c:r:a", ["help", "output="])
+    except getopt.GetoptError as err:
+        # print help information and exit:
+        print(str(err))  # will print something like "option -a not recognized"
         usage()
-        sys.exit(1)
+        sys.exit(2)
 
-    if sys.argv[1] == "complex":
-        rtli = RTLI(tokenizer_mode="complex",chunksize=int(sys.argv[2]), rank_mode=mode, docs_limit=docs_limit)
+    if len(opts) < 1:
+        usage()
+        sys.exit()
 
-    elif sys.argv[1] == "simple":
-        rtli = RTLI(tokenizer_mode="simple",chunksize=int(sys.argv[2]), rank_mode=mode, docs_limit=docs_limit)
+    for o, a in opts:
+        
+        if o in ("-h", "--help"):
+            usage()
+            sys.exit()
+        elif o == "-a":
+            analyze_table = True
+        elif o == "-c":
+            try:
+                chunksize = int(a)
+                assert int(a)>1, "chunksize bigger than 1"
+            except:
+                usage()
+                sys.exit()
 
-    else:
-        print("Usage: python3 main.py <complex/simple> <chunksize>")
-        sys.exit(1)
+        elif o in ["-r", "--ranking"]:
+            if a in ["bm25","tf_idf"]:
+                rank_mode = a
+            else:
+                print("Unrecognized ranking mode, use <tf_idf/bm25>\n")
+                usage()
+                sys.exit(1)
 
+        elif o in ["-t", "--tokenizer"]:
+            if a in ["simple","complex"]:
+                tokenizer_mode = a
+            else:
+                print("Unrecognized tokenizer mode, use <simple/complex>\n")
+                usage()
+                sys.exit(1)
+        else:
+            assert False, "unhandled option"
+    
+    rtli = RTLI(tokenizer_mode=tokenizer_mode,chunksize=chunksize, rank_mode=rank_mode, docs_limit=docs_limit)
+
+    # work nº1 calls
     tic = time.time()
     rtli.process()
     toc = time.time()
 
     rtli.domain_questions(toc-tic)
 
-
+    # work nº2 calls
     tic = time.time()
     rtli.rank(analyze_table, tokenizer_mode)
     toc = time.time()
