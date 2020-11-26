@@ -27,6 +27,9 @@ class Ranker:
         # used in ranking to check each documents length, and the average of all docs
         self.docs_length = docs_length
 
+        # used in tf_idf to calculate the square root of all weights
+        self.doc_pow = collections.defaultdict(lambda: 0)
+
         # arrays used to calculate means
         self.mean_precision_array = []
         self.mean_recall_array = []
@@ -116,9 +119,16 @@ class Ranker:
             # now we iterate over every term
             for doc_id, tf_doc in self.indexed_map[term]['doc_ids'].items():
                 tf_doc_weight = math.log10(tf_doc) + 1
+                
+                #added step for normalization
+                self.doc_pow[doc_id] += tf_doc_weight ** 2
+
                 score = (weight_query_term * tf_doc_weight) / self.docs_length[doc_id]
                 best_docs[doc_id] += score
-        
+
+        #normalize after each term
+        for doc_id, score in best_docs.items():
+            best_docs[doc_id] = score / math.sqrt(self.doc_pow[doc_id])
         
         most_relevant_docs = sorted(best_docs.items(), key=lambda x: x[1], reverse=True)
         return most_relevant_docs[:self.docs_limit]
