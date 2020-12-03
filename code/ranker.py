@@ -83,17 +83,18 @@ class Ranker:
         if analyze_table:
 
             # calculate medians, we do it like this, so its easier to read, np was the most efficient way
-            median_precision = np.median(self.mean_precision_array)
-            median_recall = np.median(self.mean_recall_array)
-            median_f_measure = np.median(self.mean_f_measure_array)
-            median_ap = np.median(self.mean_ap_array)
-            median_ndcg = np.median(self.mean_ndcg_array)
+            mean_precision = np.mean(self.mean_precision_array)
+            mean_recall = np.mean(self.mean_recall_array)
+            mean_f_measure = np.mean(self.mean_f_measure_array)
+            mean_ap = np.mean(self.mean_ap_array)
+            mean_ndcg = np.mean(self.mean_ndcg_array)
+            mean_latency = np.mean(self.mean_latency_array)
             median_latency = np.median(self.mean_latency_array)
 
-            print("Median @50: \t %.3f \t\t\t %.3f \t\t\t  %.3f \t\t  %.3f \t\t  %.3f \t  %.0fms " % \
-                (median_precision, median_recall, median_f_measure, median_ap, median_ndcg, median_latency*1000)
+            print("Mean @50: \t %.3f \t\t\t %.3f \t\t\t  %.3f \t\t  %.3f \t\t  %.3f \t  %.0fms " % \
+                (mean_precision, mean_recall, mean_f_measure, mean_ap, mean_ndcg, median_latency*1000)
             )
-            print("Query throughput: %.3f queries per second" % ( 1 * 1000 / (median_latency * 1000) ))
+            print("Query throughput: %.3f queries per second" % ( 1 * 1000 / (mean_latency * 1000) ))
 
     def queries_results(self):
         print("  \t\tPrecision \t\t Recall  	\tF-measure     \tAverage Precision \tNDCG \t\t\t Latency\nQuery #	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50	@10	@20	@50")
@@ -122,14 +123,14 @@ class Ranker:
                 tf_doc_weight = math.log10(tf_doc) + 1
                 
                 #added step for normalization
-                self.doc_pow[doc_id] += tf_doc_weight ** 2
+                #self.doc_pow[doc_id] += tf_doc_weight ** 2
 
-                score = (weight_query_term * tf_doc_weight) / self.docs_length[doc_id]
+                score = (weight_query_term * tf_doc_weight)
                 best_docs[doc_id] += score
 
         #normalize after each term
-        for doc_id, score in best_docs.items():
-            best_docs[doc_id] = score / math.sqrt(self.doc_pow[doc_id])
+        #for doc_id, score in best_docs.items():
+        #    best_docs[doc_id] = score / math.sqrt(self.doc_pow[doc_id])
         
         most_relevant_docs = sorted(best_docs.items(), key=lambda x: x[1], reverse=True)
         return most_relevant_docs[:self.docs_limit]

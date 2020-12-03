@@ -12,14 +12,25 @@ You need to install the requirements with pip:
 ## How to Run
 ```python
     cd code
-    python3 main.py <tokenizer_mode: "simple"/"complex"> <number_lines: int> <indexing_mode: "tf_idf"/"bm25">
+    python3 main.py -h
 ```
 
+### Usage 
+```
+Usage: python3 main.py 
+	-t <tokenizer_mode: complex/simple> 
+	-c <chunksize:int>
+	-n <limit of docs returned:int> 
+	-r <ranking_mode:tf_idf/bm25> 
+	-a <analyze_table:boolean>
+
+```
  * The tokenizer mode specifies if the tokenizer is **simple** or **complex**, and we know the complex one is better to analyze the text, since it deletes pronouns and commonly used words that are not related to the theme of the corpus.  
 
  * The number_lines defines the amount of lines you want to read at once, we recommend 8000-10000 for this document, since it doesnt slow down a lot but loads way less data into memory.
 
 ## Details
-The code provided is in the **/code** folder, the answers to the questions are printed by the code, but are also located in answers.txt  
+The code provided is in the **/code** folder, the answers to the questions are printed by the code with the special option -a
 **/content** provides the datasets and texts used.  
+**/output** provides the indexed map txt.  
 
